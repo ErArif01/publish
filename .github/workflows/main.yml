@@ -1,0 +1,82 @@
+name: Publish
+
+# Run on new release creation or when manually triggered
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      releaseType:
+        description: 'Where to release (staging or prod)?'     
+        required: true
+        default: 'staging'
+
+jobs:
+  staging:
+
+    name: Deploy to Staging
+    environment: 
+      name: Staging
+      url: https://mona-dotnetweb-staging.azurewebsites.net/
+    
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - run: env
+    
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.0.100'
+      
+    - name: Build with dotnet
+      run: dotnet build --configuration Release
+      
+    - name: dotnet publish
+      run: |
+        dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/dotnetweb 
+        
+    - name: 'Deploy to https://mona-dotnetweb-staging.azurewebsites.net/'
+      uses: azure/webapps-deploy@v2
+      with: 
+        app-name: mona-dotnetweb
+        publish-profile: ${{ secrets.azureWebAppPublishProfile }}
+        package: ${{env.DOTNET_ROOT}}/dotnetweb 
+        slot-name: staging
+
+  prod:
+    if: github.event.inputs.releaseType == 'prod'
+    name: Deploy to Prod
+    environment: 
+      name: Prod
+      url: https://mona-dotnetweb.azurewebsites.net/
+    needs: [staging]
+    
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - run: env
+    
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.0.100'
+      
+    - name: Build with dotnet
+      run: dotnet build --configuration Release
+      
+    - name: dotnet publish
+      run: |
+        dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/dotnetweb 
+        
+    - name: 'Deploy to https://mona-dotnetweb.azurewebsites.net/'
+      uses: azure/webapps-deploy@v2
+      with: 
+        app-name: mona-dotnetweb
+        publish-profile: ${{ secrets.azureWebAppPublishProfile }}
+        package: ${{env.DOTNET_ROOT}}/dotnetweb 
+      
